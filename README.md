@@ -9,43 +9,44 @@
 <p align="center">
   <a href="https://hook.lma1980.duckdns.org/jobs"><img src="https://hook.lma1980.duckdns.org/badges/LMA1980/mu-ci-web/status.svg" alt="CI Status"/></a>
   <a href="https://hook.lma1980.duckdns.org/jobs"><img src="https://hook.lma1980.duckdns.org/badges/LMA1980/mu-ci-web/score.svg" alt="Quality Score"/></a>
-  <a href="https://hook.lma1980.duckdns.org/jobs"><img src="https://hook.lma1980.duckdns.org/badges/LMA1980/mu-ci-web/coverage.svg" alt="Coverage"/></a>
-  <a href="https://hook.lma1980.duckdns.org/jobs"><img src="https://hook.lma1980.duckdns.org/badges/LMA1980/mu-ci-web/benchmark.svg" alt="Benchmark"/></a>
+  <a href="https://hook.lma1980.duckdns.org/badges/LMA1980/mu-ci-web/coverage.svg" alt="Coverage"/></a>
+  <a href="https://hook.lma1980.duckdns.org/badges/LMA1980/mu-ci-web/benchmark.svg" alt="Benchmark"/></a>
 </p>
 
----
+______________________________________________________________________
 
-High-performance WebAssembly queue monitoring and job drill-down frontend built with **[Leptos](https://github.com/leptos-rs/leptos) (v0.8.22 CSR)** for the `ActionRunner-rs` CI execution sidecar on SpacemiT K3 RISC-V hardware.
+WebAssembly queue monitoring, observability drill-down, and pipeline visualization frontend built with **[Leptos](https://github.com/leptos-rs/leptos) (CSR)** in the [`mu-ci`](https://github.com/LMA1980/mu-ci) platform for [`mu-ci-controller`](https://github.com/LMA1980/mu-ci-controller), operating alongside [`mu-console`](https://github.com/LMA1980/mu-console) (`https://console.lma1980.duckdns.org`).
 
----
+______________________________________________________________________
 
 ## Key Features
 
 - **Live Webhook Queue Monitor**:
-  - Real-time queue depth and execution status (`BUSY (1/1)` / `IDLE (0/1)`).
-  - High-visibility spotlight for the currently executing build with live elapsed seconds counter.
-  - Ordered FIFO pending queue with wait timers and position indicators (`#1`, `#2`, ...).
-  - Coalesced events tracking: indicates when older queued commits were superseded by newer commits for the same repository and ref to protect host compute resources.
 
-- **Deep Job Drill-Down View**:
-  - Direct URL navigation (`#/jobs/{id}`) and back navigation.
-  - Real-time build status banner, duration, commit SHA, and trigger details.
-  - Embedded live vector SVG scorecards (`/cards/{owner}/{repo}/card.svg`).
-  - Four factory metric tiles: Tests pass-ratio, Line Coverage (`llvm-cov`), Cargo Micro-Benchmarks, Security & Linter hygiene.
-  - Submodules breakdown grid: individual scorecards and metrics for all repository submodules (such as `k3-core`, `k3-engine`, `k3-manager`, dynamically scaling to any number of submodules).
-  - Step-by-step log viewer: collapsible accordion view parsing each pipeline step (`cargo fmt`, `cargo clippy`, `cargo audit`, `cargo llvm-cov`, `cargo bench`, release build) with exit codes, timing, and search filter, alongside raw stdout/stderr output.
+  - Real-time queue depth and cluster worker lock visibility (`ClusterNodeLocksBar`, `node_status`).
+  - Spotlight for executing builds with live elapsed timers and ordered FIFO pending queue with wait timers and position indicators (`#1`, `#2`, ...).
+  - Coalesced events tracking showing when older queued commits were superseded by newer commits for the same repository and ref.
+  - Global canary repository health badge (`CanaryStatusPill`) polling `GET /api/v1/canary/status` on [`mu-registry`](https://github.com/LMA1980/mu-registry).
 
-- **KPI Statistics**:
-  - Queue depth, active worker utilization, passing/failing rates, and coalescing counters.
+- **Deep Job & Observability Drill-Down Views (`src/components/`)**:
+
+  - Direct URL navigation (`#/jobs/{id}`), live build status banner, duration, commit SHA, trigger details, and embedded vector SVG scorecards (`/cards/{owner}/{repo}/card.svg`).
+  - Submodules breakdown grid dynamically scaling across repository submodules (such as `jero-core`, `jero-engine`, `jero-manager`).
+  - **DAG & Task Pipeline Tree (`PipelineTreeView`)**: Visualizes stage topology, dependencies, and typed tool tasks.
+  - **W3C Distributed Trace Waterfall (`TraceWaterfallModal`)**: Renders per-stage and cross-service trace spans reconstructed from job telemetry.
+  - **Hardware-Stratified Benchmark & Flakiness Analytics (`BenchmarkSparklinePanel`, `TestFlakinessHeatmap`)**: Tracks X100 vs. A100 vs. x86_64 micro-benchmark series and multi-run test flakiness.
+  - **Sandbox Attenuation Telemetry (`MuIsolationTelemetryPanel`)**: Displays `KernelSandbox` / `HypervisorSandbox` profiles, memlock bounds, and egress policies.
+  - Step-by-step ANSI log viewer (`ansi.rs`, `log_parser.rs`) parsing pipeline stages with exit codes, timing, search filter, and raw stdout/stderr output.
 
 - **K3 Scorecard Theme**:
+
   - Dark mode aesthetic matching the GitHub native dark palette (`#0d1117`, `#161b22`, `#2ea44f`, `#da3633`, `#e3b341`, `#58a6ff`).
 
----
+______________________________________________________________________
 
-## Architecture & Integration with ActionRunner-rs
+## Architecture & Integration
 
-```
+```text
                        [ GitHub Webhook / Developer Browser ]
                                         │
                                         ▼
@@ -56,31 +57,35 @@ High-performance WebAssembly queue monitoring and job drill-down frontend built 
                   (/, /style.css, │           │ (/webhook, /api/*, /queue,
                    /pkg/*.wasm)   │           │  /cards/*, /badges/*)
                                   ▼           ▼
-                         [ mu-ci-web ]        [ ActionRunner-rs ]
-                           (Leptos 0.8.22)     (Rust CI Sidecar)
+                         [ mu-ci-web ]        [ mu-ci-controller ] ──> [ mu-registry ]
+                         (Leptos CSR)         (CI Control Plane)       (/api/v1/canary/status)
 ```
 
-- Nginx reverse-proxies `/api/*`, `/queue`, `/webhook`, `/cards/*`, and `/badges/*` to `ActionRunner-rs` running on `127.0.0.1:8000`.
-- Nginx serves the compiled Leptos WASM bundle from `/home/lma1980/repository/mu-ci-web/dist`.
-- When an API URL query parameter `?api=https://...` is passed, the frontend automatically points its requests to the specified endpoint.
+- Nginx reverse-proxies `/api/*`, `/queue`, `/webhook`, `/cards/*`, and `/badges/*` to [`mu-ci-controller`](https://github.com/LMA1980/mu-ci-controller) (and canary status queries to [`mu-registry`](https://github.com/LMA1980/mu-registry)).
+- Nginx serves the compiled Leptos WASM bundle from `/var/www/mu-ci-web` (staged atomically by `mu-cd-agent` per [`.mucd/mu-cd.yml`](.mucd/mu-cd.yml)).
+- `mu-ci-web` (`https://hook.lma1980.duckdns.org`) operates side-by-side with [`mu-console`](https://github.com/LMA1980/mu-console) (`https://console.lma1980.duckdns.org`), sharing backend status/telemetry feeds from `mu-ci-controller`.
+- Passing `?api=https://...` in the URL overrides the target API endpoint.
 
----
+______________________________________________________________________
 
 ## Building & Verification
 
 ### Local Development with Trunk
+
 ```bash
 # Build and serve locally with hot reloading
 trunk serve
 ```
 
 ### Production Release Build
+
 ```bash
 # Compile optimized WebAssembly release bundle to ./dist
 trunk build --release
 ```
 
 ### Native Tests & Linter Hygiene
+
 ```bash
 # Verify formatting, linter hygiene, and unit tests
 cargo fmt --check
@@ -88,7 +93,7 @@ cargo clippy --all-targets -- -D warnings
 cargo test
 ```
 
----
+______________________________________________________________________
 
 ## License
 
