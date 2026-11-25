@@ -62,7 +62,7 @@ ______________________________________________________________________
 ```
 
 - Nginx reverse-proxies `/api/*`, `/queue`, `/webhook`, `/cards/*`, and `/badges/*` to [`mu-ci-controller`](https://github.com/LMA1980/mu-ci-controller) (and canary status queries to [`mu-registry`](https://github.com/LMA1980/mu-registry)).
-- Nginx serves the compiled Leptos WASM bundle from `/var/www/mu-ci-web` (staged atomically by `mu-cd-agent` per [`.mucd/mu-cd.yml`](.mucd/mu-cd.yml)).
+- Nginx serves the compiled Leptos WASM bundle from `/var/www/mu-ci-web` (staged atomically by `mu-cd-agent` per centralized [`mu-cd`](https://github.com/LMA1980/mu-cd) deployment policy).
 - `mu-ci-web` (`https://hook.lma1980.duckdns.org`) operates side-by-side with [`mu-console`](https://github.com/LMA1980/mu-console) (`https://console.lma1980.duckdns.org`), sharing backend status/telemetry feeds from `mu-ci-controller`.
 - Passing `?api=https://...` in the URL overrides the target API endpoint.
 
